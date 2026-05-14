@@ -1,4 +1,5 @@
 Plagiarism Checker with AI Writing Analysis
+
 A full-stack plagiarism checker web application built using React, FastAPI, and MySQL. The system allows users to upload assignment files or paste text directly, then generates a report showing plagiarism percentage, originality percentage, and AI/Human/Mixed writing analysis.
 ---
 Features

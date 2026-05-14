@@ -1,0 +1,433 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f3f6fb;
+  color: #111827;
+}
+
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: 30px auto;
+}
+
+h1,
+h2,
+h3 {
+  color: #0f172a;
+}
+
+/* Auth Page */
+.auth-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #2563eb, #1e293b);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 30px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 560px;
+  background: #ffffff;
+  padding: 46px 44px;
+  border-radius: 22px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+  text-align: center;
+}
+
+.brand-area {
+  margin-bottom: 34px;
+}
+
+.auth-card h1 {
+  font-size: 44px;
+  line-height: 1.15;
+  margin: 0 0 14px 0;
+  color: #0f172a;
+  font-weight: 800;
+  letter-spacing: -1.2px;
+}
+
+.subtitle {
+  color: #475569;
+  font-size: 16px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.auth-form h2 {
+  margin: 0;
+  font-size: 27px;
+  color: #0f172a;
+}
+
+.form-note {
+  margin: -5px 0 8px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.auth-form input,
+.auth-form select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 15px;
+  border: 1px solid #d1d5db;
+  background-color: #ffffff;
+  color: #111827;
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+}
+
+.auth-form input::placeholder {
+  color: #94a3b8;
+}
+
+.auth-form input:focus,
+.auth-form select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.full-btn {
+  width: 100%;
+  height: 47px;
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.switch-text {
+  font-size: 14px;
+  color: #475569;
+  margin-top: 8px;
+}
+
+.switch-text span {
+  color: #2563eb;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* Top Bar */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  padding: 20px 24px;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.topbar h1 {
+  text-align: left;
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.2;
+}
+
+.topbar p {
+  margin: 6px 0 0;
+  color: #475569;
+}
+
+.logout-btn {
+  background-color: #111827;
+}
+
+.logout-btn:hover {
+  background-color: #374151;
+}
+
+/* Cards */
+.card {
+  background: #ffffff;
+  padding: 24px;
+  margin-top: 22px;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.hero-card {
+  border-left: 5px solid #2563eb;
+}
+
+.hero-card p {
+  color: #475569;
+  line-height: 1.6;
+}
+
+.checker-card {
+  border-top: 5px solid #2563eb;
+}
+
+/* Buttons */
+button {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 5px;
+  font-size: 14px;
+}
+
+button:hover {
+  background-color: #1d4ed8;
+}
+
+.delete-btn {
+  background-color: #dc2626;
+  margin-left: 8px;
+}
+
+.delete-btn:hover {
+  background-color: #b91c1c;
+}
+
+.example-btn {
+  background-color: #111827;
+}
+
+.example-btn:hover {
+  background-color: #374151;
+}
+
+/* Upload / Paste */
+.input-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.input-tabs button {
+  background-color: #e5e7eb;
+  color: #111827;
+}
+
+.input-tabs button.active-tab {
+  background-color: #2563eb;
+  color: white;
+}
+
+.upload-box,
+.paste-box {
+  margin-top: 10px;
+}
+
+.upload-box input {
+  margin-right: 10px;
+  padding: 8px;
+}
+
+.paste-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.paste-box input,
+.paste-box textarea {
+  padding: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: Arial, sans-serif;
+  background: #ffffff;
+  color: #111827;
+}
+
+.paste-box textarea {
+  min-height: 220px;
+  resize: vertical;
+}
+
+.paste-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Notes */
+.message {
+  margin-top: 15px;
+  color: #15803d;
+  font-weight: bold;
+}
+
+.small-note {
+  color: #64748b;
+  font-size: 14px;
+  margin-top: 12px;
+}
+
+.privacy-note {
+  background-color: #eff6ff;
+  border-left: 4px solid #2563eb;
+  padding: 12px;
+  margin-top: 18px;
+  color: #1e3a8a;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.warning-note {
+  background-color: #fff7ed;
+  border-left: 4px solid #f97316;
+  padding: 12px;
+  margin-top: 20px;
+  color: #7c2d12;
+  line-height: 1.5;
+}
+
+/* Table */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+th,
+td {
+  border: 1px solid #e5e7eb;
+  padding: 12px;
+  text-align: left;
+}
+
+th {
+  background-color: #f1f5f9;
+  color: #111827;
+}
+
+td {
+  background-color: #ffffff;
+}
+
+/* Report */
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 15px;
+}
+
+.result-box {
+  background-color: #f8fafc;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.result-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.big-score {
+  font-size: 30px;
+  font-weight: bold;
+  color: #2563eb;
+  margin: 10px 0;
+}
+
+.matched-box {
+  background-color: #fff7ed;
+  border-left: 4px solid #f97316;
+  padding: 14px;
+  margin-top: 12px;
+  border-radius: 8px;
+}
+
+.matched-box p {
+  margin: 7px 0;
+}
+
+.sentence-text {
+  background-color: #ffffff;
+  border: 1px solid #fed7aa;
+  padding: 10px;
+  border-radius: 6px;
+  color: #111827;
+  line-height: 1.5;
+}
+
+.paragraph-box {
+  background-color: #f8fafc;
+  padding: 12px;
+  border-left: 4px solid #2563eb;
+  margin-top: 10px;
+  border-radius: 6px;
+}
+
+.paragraph-box p {
+  margin: 6px 0;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .result-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  table {
+    font-size: 13px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 600px) {
+  .container {
+    width: 95%;
+    margin: 15px auto;
+  }
+
+  .auth-card {
+    padding: 32px 24px;
+  }
+
+  .auth-card h1 {
+    font-size: 34px;
+  }
+
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .input-tabs {
+    flex-direction: column;
+  }
+
+  .upload-box input {
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .paste-actions {
+    flex-direction: column;
+  }
+
+  .delete-btn {
+    margin-left: 0;
+    display: block;
+  }
+}

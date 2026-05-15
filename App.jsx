@@ -29,6 +29,8 @@ function App() {
   const [message, setMessage] = useState("");
   const [report, setReport] = useState(null);
 
+  const isLecturer = user?.role === "lecturer";
+
   const resetLoginForm = () => {
     setLoginData({
       email: "",
@@ -45,6 +47,32 @@ function App() {
     });
   };
 
+  const clearPasteText = () => {
+    setTextTitle("");
+    setPastedText("");
+    setMessage("Pasted text cleared");
+  };
+
+  const loadAssignments = async (currentUser = user) => {
+    if (!currentUser) {
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${API_URL}/assignments`, {
+        params: {
+          user_id: currentUser.id,
+          role: currentUser.role,
+        },
+      });
+
+      setAssignments(response.data);
+    } catch (error) {
+      console.error(error);
+      setMessage("Failed to load assignments");
+    }
+  };
+
   const handleSignup = async () => {
     if (!signupData.name || !signupData.email || !signupData.password) {
       setMessage("Please fill all signup fields");
@@ -59,18 +87,13 @@ function App() {
     try {
       setMessage("Creating account...");
 
-      const response = await axios.post(`${API_URL}/signup`, {
-        name: signupData.name,
-        email: signupData.email,
-        password: signupData.password,
-        role: signupData.role,
-      });
+      const response = await axios.post(`${API_URL}/signup`, signupData);
 
       setUser(response.data.user);
       resetSignupForm();
       resetLoginForm();
       setMessage("");
-      loadAssignments();
+      loadAssignments(response.data.user);
     } catch (error) {
       console.error(error);
       setMessage(error.response?.data?.detail || "Signup failed");
@@ -86,15 +109,12 @@ function App() {
     try {
       setMessage("Logging in...");
 
-      const response = await axios.post(`${API_URL}/login`, {
-        email: loginData.email,
-        password: loginData.password,
-      });
+      const response = await axios.post(`${API_URL}/login`, loginData);
 
       setUser(response.data.user);
       resetLoginForm();
       setMessage("");
-      loadAssignments();
+      loadAssignments(response.data.user);
     } catch (error) {
       console.error(error);
       setMessage(error.response?.data?.detail || "Login failed");
@@ -110,16 +130,6 @@ function App() {
     resetSignupForm();
   };
 
-  const loadAssignments = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/assignments`);
-      setAssignments(response.data);
-    } catch (error) {
-      console.error(error);
-      setMessage("Failed to load assignments");
-    }
-  };
-
   const uploadFile = async () => {
     if (!file) {
       setMessage("Please select a file first");
@@ -128,6 +138,9 @@ function App() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("user_id", user.id);
+    formData.append("uploader_name", user.name);
+    formData.append("uploader_role", user.role);
 
     try {
       setMessage("Uploading file...");
@@ -158,9 +171,12 @@ function App() {
     }
 
     if (pastedText.trim().length < 50) {
-      setMessage(
-        "Please enter at least 50 characters for better checking accuracy"
-      );
+      setMessage("Please enter at least 50 characters for better checking accuracy");
+      return;
+    }
+
+    if (pastedText.trim().length > 3000) {
+      setMessage("Pasted text cannot exceed 3000 characters");
       return;
     }
 
@@ -170,6 +186,9 @@ function App() {
       const response = await axios.post(`${API_URL}/submit-text`, {
         title: textTitle || "Pasted Assignment",
         text: pastedText,
+        user_id: user.id,
+        uploader_name: user.name,
+        uploader_role: user.role,
       });
 
       setMessage(
@@ -197,6 +216,11 @@ function App() {
   };
 
   const getFullReport = async (assignmentId) => {
+    if (!isLecturer) {
+      setMessage("Only lecturers can view report details");
+      return;
+    }
+
     try {
       setMessage("Generating report...");
 
@@ -220,7 +244,12 @@ function App() {
     try {
       setMessage("Deleting assignment...");
 
-      await axios.delete(`${API_URL}/assignments/${assignmentId}`);
+      await axios.delete(`${API_URL}/assignments/${assignmentId}`, {
+        params: {
+          user_id: user.id,
+          role: user.role,
+        },
+      });
 
       setMessage("Assignment deleted successfully");
       setReport(null);
@@ -238,7 +267,7 @@ function App() {
           <div className="brand-area">
             <h1>Plagiarism Checker</h1>
             <p className="subtitle">
-              Check plagiarism, originality, human writing, AI writing, and mixed writing patterns.
+              Upload assignments, detect similarity, and review AI-writing patterns.
             </p>
           </div>
 
@@ -289,7 +318,9 @@ function App() {
           ) : (
             <div className="auth-form">
               <h2>Create Profile</h2>
-              <p className="form-note">Create an account to start checking assignments</p>
+              <p className="form-note">
+                Choose Student or Lecturer account type
+              </p>
 
               <input
                 type="text"
@@ -332,7 +363,6 @@ function App() {
               >
                 <option value="student">Student</option>
                 <option value="lecturer">Lecturer</option>
-                <option value="admin">Admin</option>
               </select>
 
               <button className="full-btn" onClick={handleSignup}>
@@ -379,8 +409,8 @@ function App() {
       <div className="card hero-card">
         <h2>Check Your Assignment</h2>
         <p>
-          Upload a document or paste assignment text to generate a plagiarism,
-          originality, and AI-writing analysis report.
+          Students and lecturers can upload PDF, DOCX, TXT files or paste text.
+          Students can view and delete their own uploaded files. Detailed reports are visible only to lecturers.
         </p>
       </div>
 
@@ -433,11 +463,12 @@ function App() {
             <textarea
               placeholder="Paste assignment text here..."
               value={pastedText}
+              maxLength={3000}
               onChange={(e) => setPastedText(e.target.value)}
             ></textarea>
 
             <p className="small-note">
-              Characters: {pastedText.length} | Minimum recommended: 50 characters
+              Characters: {pastedText.length}/3000 | Minimum recommended: 50 characters
             </p>
 
             <div className="paste-actions">
@@ -446,6 +477,10 @@ function App() {
               <button className="example-btn" onClick={loadExampleText}>
                 Try Example
               </button>
+
+              <button className="clear-btn" onClick={clearPasteText}>
+                Clear Text
+              </button>
             </div>
           </div>
         )}
@@ -453,13 +488,19 @@ function App() {
         {message && <p className="message">{message}</p>}
 
         <p className="privacy-note">
-          Uploaded assignments are stored in the local MySQL database for comparison.
-          AI percentage is only an estimated value and should not be treated as final proof.
+          Upload is available for both students and lecturers. Reports and matched sources
+          are available only for lecturer accounts.
         </p>
       </div>
 
       <div className="card">
-        <h2>Saved Assignments</h2>
+        <h2>{isLecturer ? "Saved Assignments" : "My Uploaded Files"}</h2>
+
+        {!isLecturer && (
+          <p className="student-note">
+            Report details are visible only to lecturers. Submitted files are listed below.
+          </p>
+        )}
 
         {assignments.length === 0 ? (
           <p>No assignments uploaded yet.</p>
@@ -471,6 +512,7 @@ function App() {
                 <th>Filename</th>
                 <th>Text Length</th>
                 <th>Uploaded At</th>
+                {isLecturer && <th>Uploaded By</th>}
                 <th>Actions</th>
               </tr>
             </thead>
@@ -482,10 +524,17 @@ function App() {
                   <td>{assignment.filename}</td>
                   <td>{assignment.text_length}</td>
                   <td>{assignment.uploaded_at}</td>
+
+                  {isLecturer && (
+                    <td>{assignment.uploader_name || "Unknown"}</td>
+                  )}
+
                   <td>
-                    <button onClick={() => getFullReport(assignment.id)}>
-                      Check Report
-                    </button>
+                    {isLecturer && (
+                      <button onClick={() => getFullReport(assignment.id)}>
+                        Check Report
+                      </button>
+                    )}
 
                     <button
                       className="delete-btn"
@@ -501,7 +550,7 @@ function App() {
         )}
       </div>
 
-      {report && (
+      {isLecturer && report && (
         <div className="card report">
           <h2>Full Report</h2>
 

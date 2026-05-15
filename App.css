@@ -172,6 +172,15 @@ h3 {
   border-top: 5px solid #2563eb;
 }
 
+.student-note {
+  background-color: #f0fdf4;
+  border-left: 4px solid #16a34a;
+  padding: 12px;
+  color: #166534;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+
 /* Buttons */
 button {
   background-color: #2563eb;
@@ -203,6 +212,14 @@ button:hover {
 
 .example-btn:hover {
   background-color: #374151;
+}
+
+.clear-btn {
+  background-color: #6b7280;
+}
+
+.clear-btn:hover {
+  background-color: #4b5563;
 }
 
 /* Upload / Paste */

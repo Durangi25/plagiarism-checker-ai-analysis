@@ -1,6 +1,7 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import fitz
 from docx import Document
 from io import BytesIO
@@ -22,18 +23,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+DB_NAME = "assignment_checker"
+MYSQL_USER = "root"
+MYSQL_PASSWORD = "1234"
+
+
+# -------------------------------
+# Database Connection
+# -------------------------------
+def get_server_connection():
+    return mysql.connector.connect(
+        host="127.0.0.1",
+        port=3308,
+        user=MYSQL_USER,
+        password=MYSQL_PASSWORD
+    )
+
 
 def get_db_connection():
     return mysql.connector.connect(
         host="127.0.0.1",
         port=3308,
-        user="root",
-        password="1234",
-        database="assignment_checker"
+        user=MYSQL_USER,
+        password=MYSQL_PASSWORD,
+        database=DB_NAME
     )
 
 
 def create_required_tables():
+    server_conn = get_server_connection()
+    server_cursor = server_conn.cursor()
+
+    server_cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_NAME}")
+
+    server_conn.commit()
+    server_cursor.close()
+    server_conn.close()
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -54,9 +80,25 @@ def create_required_tables():
             filename VARCHAR(255),
             extracted_text LONGTEXT,
             text_length INT,
+            user_id INT NULL,
+            uploader_name VARCHAR(100),
+            uploader_role VARCHAR(50) DEFAULT 'student',
             uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    extra_columns = {
+        "user_id": "ALTER TABLE assignments ADD COLUMN user_id INT NULL",
+        "uploader_name": "ALTER TABLE assignments ADD COLUMN uploader_name VARCHAR(100)",
+        "uploader_role": "ALTER TABLE assignments ADD COLUMN uploader_role VARCHAR(50) DEFAULT 'student'"
+    }
+
+    for column_name, alter_sql in extra_columns.items():
+        cursor.execute("SHOW COLUMNS FROM assignments LIKE %s", (column_name,))
+        result = cursor.fetchone()
+
+        if result is None:
+            cursor.execute(alter_sql)
 
     conn.commit()
     cursor.close()
@@ -68,6 +110,9 @@ def startup_event():
     create_required_tables()
 
 
+# -------------------------------
+# Request Models
+# -------------------------------
 class SignupRequest(BaseModel):
     name: str
     email: str
@@ -83,8 +128,14 @@ class LoginRequest(BaseModel):
 class TextSubmissionRequest(BaseModel):
     title: str
     text: str
+    user_id: Optional[int] = None
+    uploader_name: Optional[str] = ""
+    uploader_role: Optional[str] = "student"
 
 
+# -------------------------------
+# Password Hashing
+# -------------------------------
 def hash_password(password, salt=None):
     if salt is None:
         salt = secrets.token_hex(16)
@@ -108,6 +159,9 @@ def verify_password(password, stored_password):
         return False
 
 
+# -------------------------------
+# Basic Routes
+# -------------------------------
 @app.get("/")
 def home():
     return {"message": "Plagiarism Checker Backend Running"}
@@ -123,8 +177,19 @@ def db_test():
         return {"error": str(e)}
 
 
+# -------------------------------
+# Signup
+# -------------------------------
 @app.post("/signup")
 def signup_user(user: SignupRequest):
+    role = user.role.strip().lower()
+
+    if role not in ["student", "lecturer"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Only student and lecturer roles are allowed"
+        )
+
     if len(user.name.strip()) < 2:
         raise HTTPException(
             status_code=400,
@@ -153,7 +218,7 @@ def signup_user(user: SignupRequest):
             user.name.strip(),
             user.email.strip().lower(),
             password_hash,
-            user.role.lower()
+            role
         ))
 
         conn.commit()
@@ -165,7 +230,7 @@ def signup_user(user: SignupRequest):
                 "id": user_id,
                 "name": user.name.strip(),
                 "email": user.email.strip().lower(),
-                "role": user.role.lower()
+                "role": role
             }
         }
 
@@ -181,12 +246,6 @@ def signup_user(user: SignupRequest):
             detail=f"MySQL error: {str(e)}"
         )
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Signup error: {str(e)}"
-        )
-
     finally:
         if cursor:
             cursor.close()
@@ -194,6 +253,9 @@ def signup_user(user: SignupRequest):
             conn.close()
 
 
+# -------------------------------
+# Login
+# -------------------------------
 @app.post("/login")
 def login_user(user: LoginRequest):
     conn = get_db_connection()
@@ -222,6 +284,12 @@ def login_user(user: LoginRequest):
             detail="Invalid email or password"
         )
 
+    if db_user["role"] not in ["student", "lecturer"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Only student and lecturer roles are allowed"
+        )
+
     return {
         "message": "Login successful",
         "user": {
@@ -233,6 +301,9 @@ def login_user(user: LoginRequest):
     }
 
 
+# -------------------------------
+# Text Extraction
+# -------------------------------
 def extract_text_from_pdf(file_bytes):
     text = ""
     pdf_document = fitz.open(stream=file_bytes, filetype="pdf")
@@ -258,14 +329,37 @@ def extract_text_from_txt(file_bytes):
     return file_bytes.decode("utf-8", errors="ignore")
 
 
-def save_assignment(filename, extracted_text):
+# -------------------------------
+# Assignment Saving
+# -------------------------------
+def save_assignment(
+    filename,
+    extracted_text,
+    user_id=None,
+    uploader_name="",
+    uploader_role="student"
+):
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT INTO assignments (filename, extracted_text, text_length)
-        VALUES (%s, %s, %s)
-    """, (filename, extracted_text, len(extracted_text)))
+        INSERT INTO assignments (
+            filename,
+            extracted_text,
+            text_length,
+            user_id,
+            uploader_name,
+            uploader_role
+        )
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (
+        filename,
+        extracted_text,
+        len(extracted_text),
+        user_id,
+        uploader_name,
+        uploader_role
+    ))
 
     conn.commit()
     assignment_id = cursor.lastrowid
@@ -276,17 +370,28 @@ def save_assignment(filename, extracted_text):
     return assignment_id
 
 
+# -------------------------------
+# Upload File
+# -------------------------------
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(
+    file: UploadFile = File(...),
+    user_id: Optional[int] = Form(None),
+    uploader_name: str = Form(""),
+    uploader_role: str = Form("student")
+):
     file_bytes = await file.read()
     filename_lower = file.filename.lower()
 
     if filename_lower.endswith(".pdf"):
         extracted_text = extract_text_from_pdf(file_bytes)
+
     elif filename_lower.endswith(".docx"):
         extracted_text = extract_text_from_docx(file_bytes)
+
     elif filename_lower.endswith(".txt"):
         extracted_text = extract_text_from_txt(file_bytes)
+
     else:
         raise HTTPException(
             status_code=400,
@@ -299,7 +404,13 @@ async def upload_file(file: UploadFile = File(...)):
             detail="No text found in the uploaded file"
         )
 
-    assignment_id = save_assignment(file.filename, extracted_text)
+    assignment_id = save_assignment(
+        file.filename,
+        extracted_text,
+        user_id,
+        uploader_name,
+        uploader_role
+    )
 
     return {
         "message": "File uploaded and saved successfully",
@@ -310,6 +421,9 @@ async def upload_file(file: UploadFile = File(...)):
     }
 
 
+# -------------------------------
+# Submit Pasted Text
+# -------------------------------
 @app.post("/submit-text")
 def submit_text_assignment(request: TextSubmissionRequest):
     if request.text.strip() == "":
@@ -324,8 +438,21 @@ def submit_text_assignment(request: TextSubmissionRequest):
             detail="Please enter at least 50 characters for better checking accuracy"
         )
 
+    if len(request.text.strip()) > 3000:
+        raise HTTPException(
+            status_code=400,
+            detail="Pasted text cannot exceed 3000 characters"
+        )
+
     filename = request.title.strip() or "Pasted Assignment"
-    assignment_id = save_assignment(filename, request.text)
+
+    assignment_id = save_assignment(
+        filename,
+        request.text,
+        request.user_id,
+        request.uploader_name,
+        request.uploader_role
+    )
 
     return {
         "message": "Text submitted and saved successfully",
@@ -336,18 +463,47 @@ def submit_text_assignment(request: TextSubmissionRequest):
     }
 
 
+# -------------------------------
+# Assignment List
+# Student sees own files only
+# Lecturer sees all files
+# -------------------------------
 @app.get("/assignments")
-def get_assignments():
+def get_assignments(
+    user_id: Optional[int] = None,
+    role: str = "student"
+):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT id, filename, text_length, uploaded_at
-        FROM assignments
-        ORDER BY id DESC
-    """)
+    role = role.lower()
 
-    rows = cursor.fetchall()
+    if role == "lecturer":
+        cursor.execute("""
+            SELECT id, filename, text_length, uploaded_at, uploader_name, uploader_role
+            FROM assignments
+            ORDER BY id DESC
+        """)
+
+        rows = cursor.fetchall()
+
+    else:
+        if user_id is None:
+            cursor.close()
+            conn.close()
+            raise HTTPException(
+                status_code=400,
+                detail="user_id is required for student assignment list"
+            )
+
+        cursor.execute("""
+            SELECT id, filename, text_length, uploaded_at, uploader_name, uploader_role
+            FROM assignments
+            WHERE user_id = %s
+            ORDER BY id DESC
+        """, (user_id,))
+
+        rows = cursor.fetchall()
 
     cursor.close()
     conn.close()
@@ -357,7 +513,9 @@ def get_assignments():
             "id": row[0],
             "filename": row[1],
             "text_length": row[2],
-            "uploaded_at": str(row[3])
+            "uploaded_at": str(row[3]),
+            "uploader_name": row[4],
+            "uploader_role": row[5]
         }
         for row in rows
     ]
@@ -399,6 +557,9 @@ def get_other_assignments(assignment_id):
     return rows
 
 
+# -------------------------------
+# Plagiarism Helper Functions
+# -------------------------------
 def clean_text(text):
     text = text.lower()
     text = re.sub(r'\s+', ' ', text)
@@ -431,6 +592,9 @@ def calculate_sentence_similarity(sentence1, sentence2):
         return 0
 
 
+# -------------------------------
+# Detailed Plagiarism Checker
+# -------------------------------
 @app.get("/detailed-plagiarism/{assignment_id}")
 def detailed_plagiarism_check(assignment_id: int):
     current_assignment = get_assignment_by_id(assignment_id)
@@ -550,6 +714,9 @@ def check_plagiarism(assignment_id: int):
     return detailed_plagiarism_check(assignment_id)
 
 
+# -------------------------------
+# AI Writing Analysis
+# -------------------------------
 def split_paragraphs(text):
     paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
     return paragraphs if paragraphs else [text]
@@ -582,10 +749,7 @@ def calculate_ai_score(paragraph):
 
     if len(sentence_lengths) > 1:
         mean_length = sum(sentence_lengths) / len(sentence_lengths)
-        variance = sum(
-            (length - mean_length) ** 2
-            for length in sentence_lengths
-        ) / len(sentence_lengths)
+        variance = sum((length - mean_length) ** 2 for length in sentence_lengths) / len(sentence_lengths)
     else:
         variance = 0
 
@@ -637,8 +801,10 @@ def classify_paragraph(paragraph):
 
     if ai_score >= 70:
         return "AI", ai_score
+
     elif ai_score <= 40:
         return "Human", ai_score
+
     else:
         return "Mixed", ai_score
 
@@ -678,8 +844,10 @@ def check_ai_percentage(assignment_id: int):
 
         if label == "Human":
             human_words += word_count
+
         elif label == "AI":
             ai_words += word_count
+
         else:
             mixed_words += word_count
 
@@ -726,13 +894,23 @@ def full_report(assignment_id: int):
     }
 
 
+# -------------------------------
+# Delete Assignment
+# Student can delete own files only
+# Lecturer can delete any file
+# -------------------------------
 @app.delete("/assignments/{assignment_id}")
-def delete_assignment(assignment_id: int):
+def delete_assignment(
+    assignment_id: int,
+    user_id: Optional[int] = None,
+    role: str = "student"
+):
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT id FROM assignments
+        SELECT id, user_id
+        FROM assignments
         WHERE id = %s
     """, (assignment_id,))
 
@@ -744,6 +922,34 @@ def delete_assignment(assignment_id: int):
         raise HTTPException(
             status_code=404,
             detail="Assignment not found"
+        )
+
+    assignment_owner_id = assignment[1]
+    role = role.lower()
+
+    if role == "student":
+        if user_id is None:
+            cursor.close()
+            conn.close()
+            raise HTTPException(
+                status_code=400,
+                detail="user_id is required for student delete"
+            )
+
+        if assignment_owner_id != user_id:
+            cursor.close()
+            conn.close()
+            raise HTTPException(
+                status_code=403,
+                detail="Students can delete only their own uploaded files"
+            )
+
+    elif role != "lecturer":
+        cursor.close()
+        conn.close()
+        raise HTTPException(
+            status_code=403,
+            detail="Only student and lecturer roles are allowed"
         )
 
     cursor.execute("""
